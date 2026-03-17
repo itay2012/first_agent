@@ -20,7 +20,7 @@
  * ─────────────────────────────────────────────────────────────
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import Groq from "groq-sdk";
 import fs from "fs";
 import path from "path";
 import readline from "readline";
@@ -40,8 +40,8 @@ const SERVICES = {
   treatment: { name: "Hair Treatment / טיפול שיער", price: 350, duration: 90, durationText: "1.5 hours" },
 };
 
-// ─── Anthropic client ─────────────────────────────────────────
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// ─── Groq client ──────────────────────────────────────────────
+const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 // ─── Data helpers ─────────────────────────────────────────────
 function loadBookings() {
@@ -320,25 +320,23 @@ async function chatWithAI(userMessage) {
   conversationHistory.push({ role: "user", content: userMessage });
 
   try {
-    const stream = client.messages.stream({
-      model: "claude-opus-4-6",
+    const stream = await client.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
       max_tokens: 1024,
-      thinking: { type: "adaptive" },
-      system: SYSTEM_PROMPT,
-      messages: conversationHistory,
+      stream: true,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...conversationHistory,
+      ],
     });
 
     process.stdout.write("\n  🤖 Studio Shira: ");
 
     let fullText = "";
-    for await (const event of stream) {
-      if (
-        event.type === "content_block_delta" &&
-        event.delta.type === "text_delta"
-      ) {
-        process.stdout.write(event.delta.text);
-        fullText += event.delta.text;
-      }
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content ?? "";
+      process.stdout.write(delta);
+      fullText += delta;
     }
     console.log("\n");
 
@@ -362,13 +360,7 @@ async function chatWithAI(userMessage) {
       console.log("  📩 [Question saved for Shira / השאלה נשמרה לשירה]\n");
     }
   } catch (err) {
-    if (err instanceof Anthropic.RateLimitError) {
-      console.log("\n  ⚠️  Rate limit reached. Please try again in a moment.\n");
-    } else if (err instanceof Anthropic.AuthenticationError) {
-      console.log("\n  ❌ API key error. Please check ANTHROPIC_API_KEY.\n");
-    } else {
-      console.log("\n  ❌ Error communicating with AI:", err.message, "\n");
-    }
+    console.log("\n  ❌ Error communicating with AI:", err.message, "\n");
   }
 }
 
@@ -397,9 +389,9 @@ function printWelcome() {
 
 // ─── Main loop ────────────────────────────────────────────────
 async function main() {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.error("❌ Missing ANTHROPIC_API_KEY environment variable.");
-    console.error("   Run: export ANTHROPIC_API_KEY=your_key_here");
+  if (!process.env.GROQ_API_KEY) {
+    console.error("❌ Missing GROQ_API_KEY environment variable.");
+    console.error("   Run: export GROQ_API_KEY=your_key_here");
     process.exit(1);
   }
 
