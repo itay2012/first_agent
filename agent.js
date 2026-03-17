@@ -1,13 +1,18 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const client = new Anthropic();
+const apiKey = process.env.GOOGLE_API_KEY;
+if (!apiKey) {
+  console.error("Error: GOOGLE_API_KEY is not set.");
+  console.error("Please run: export GOOGLE_API_KEY=your_key_here");
+  process.exit(1);
+}
+
+const genAI = new GoogleGenerativeAI(apiKey);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 async function fetchWebsiteContent(url) {
   const response = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (compatible; WebAnalyzerBot/1.0)",
-    },
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; WebAnalyzerBot/1.0)" },
     redirect: "follow",
   });
 
@@ -31,85 +36,32 @@ async function fetchWebsiteContent(url) {
 
 async function analyzeWebsite(url) {
   console.log(`\nAnalyzing: ${url}\n${"─".repeat(50)}`);
+  console.log("Fetching website content...");
 
-  const tools = [
-    {
-      name: "fetch_website",
-      description:
-        "Fetches the content of a website URL and returns the readable text content.",
-      input_schema: {
-        type: "object",
-        properties: {
-          url: {
-            type: "string",
-            description: "The full URL of the website to fetch",
-          },
-        },
-        required: ["url"],
-      },
-    },
-  ];
-
-  const messages = [
-    {
-      role: "user",
-      content: `Please analyze the website at ${url}. Use the fetch_website tool to get its content, then tell me:
-1. What the business does (their main product or service)
-2. Who their target customers are
-3. What specific services or products they offer
-
-Be concise and structured in your response.`,
-    },
-  ];
-
-  // Agentic loop
-  while (true) {
-    const response = await client.messages.create({
-      model: "claude-opus-4-6",
-      max_tokens: 1024,
-      tools,
-      messages,
-    });
-
-    if (response.stop_reason === "end_turn") {
-      // Print final response
-      for (const block of response.content) {
-        if (block.type === "text") {
-          console.log(block.text);
-        }
-      }
-      break;
-    }
-
-    if (response.stop_reason === "tool_use") {
-      messages.push({ role: "assistant", content: response.content });
-
-      const toolResults = [];
-      for (const block of response.content) {
-        if (block.type === "tool_use" && block.name === "fetch_website") {
-          console.log(`Fetching website content...`);
-          let result;
-          try {
-            result = await fetchWebsiteContent(block.input.url);
-            console.log(`Fetched ${result.length} characters of content.\n`);
-          } catch (err) {
-            result = `Error fetching website: ${err.message}`;
-            console.error(result);
-          }
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: block.id,
-            content: result,
-          });
-        }
-      }
-
-      messages.push({ role: "user", content: toolResults });
-    } else {
-      // Unexpected stop reason
-      break;
-    }
+  let websiteText;
+  try {
+    websiteText = await fetchWebsiteContent(url);
+    console.log(`Fetched ${websiteText.length} characters of content.\n`);
+  } catch (err) {
+    console.error(`Error fetching website: ${err.message}`);
+    process.exit(1);
   }
+
+  const prompt = `Here is the text content from the website ${url}:
+
+${websiteText}
+
+Based on this content, please answer these three questions clearly:
+
+1. What does this business do? (their main product or service)
+2. Who are their target customers?
+3. What specific services or products do they offer?
+
+Keep each answer short and easy to understand.`;
+
+  const result = await model.generateContent(prompt);
+  const response = result.response.text();
+  console.log(response);
 }
 
 // Main — read URL from command line args
