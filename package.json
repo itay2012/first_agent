@@ -1,0 +1,21 @@
+{
+  "name": "first_agent",
+  "version": "1.0.0",
+  "description": "",
+  "main": "agent.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:41925/git/itay2012/first_agent"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.79.0",
+    "node-fetch": "^3.3.2"
+  }
+}
