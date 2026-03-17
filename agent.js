@@ -1,14 +1,13 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 
-const apiKey = process.env.GOOGLE_API_KEY;
+const apiKey = process.env.GROQ_API_KEY;
 if (!apiKey) {
-  console.error("Error: GOOGLE_API_KEY is not set.");
-  console.error("Please run: export GOOGLE_API_KEY=your_key_here");
+  console.error("Error: GROQ_API_KEY is not set.");
+  console.error("Please run: export GROQ_API_KEY=your_key_here");
   process.exit(1);
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const groq = new Groq({ apiKey });
 
 async function fetchWebsiteContent(url) {
   const response = await fetch(url, {
@@ -59,9 +58,12 @@ Based on this content, please answer these three questions clearly:
 
 Keep each answer short and easy to understand.`;
 
-  const result = await model.generateContent(prompt);
-  const response = result.response.text();
-  console.log(response);
+  const result = await groq.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  console.log(result.choices[0].message.content);
 }
 
 // Main — read URL from command line args
